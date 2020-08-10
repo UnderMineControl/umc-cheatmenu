@@ -63,8 +63,15 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>libs\UnityEngine.CoreModule.dll</HintPath>
     </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>libs\UnityEngine.IMGUIModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>libs\UnityEngine.UI.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CheatMenuExtensions.cs" />
     <Compile Include="CheatMenuMod.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

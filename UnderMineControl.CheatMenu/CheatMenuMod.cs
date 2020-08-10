@@ -12,56 +12,106 @@ namespace UnderMineControl.CheatMenu
 
     public class CheatMenuMod : Mod
     {
-        private Dictionary<KeyCode[], Action> _cheatOptions;
         private string Desktop => Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+        private bool _showWindow = false;
+
+        private bool _previousCursor = false;
+        private CursorLockMode _previousLockMode = CursorLockMode.None;
 
         public override void Initialize()
         {
             Logger.Debug("Cheat Menu Mod is intializing...");
-            _cheatOptions = new Dictionary<KeyCode[], Action>
-            {
-                [new[] { KeyCode.Alpha1, KeyCode.F1 }] = () => Logger.Debug("Alpha 1 + F1 pressed"),
-                [new[] { KeyCode.F1 }] = OpenDoors,
-                [new[] { KeyCode.F2 }] = CloseDoors,
-                [new[] { KeyCode.F3 }] = () => Player.Invulnerable = !Player.Invulnerable,
-                [new[] { KeyCode.F4 }] = () => Player.MaxHP = Player.CurrentHP = 1500,
-                [new[] { KeyCode.F5 }] = () => Player.AddRandomBlessing(),
-                [new[] { KeyCode.F6 }] = () => { Player.RemoveRandomCurse(out _); Player.RemoveRandomCurse(out _, HealthExt.CurseType.Major); },
-                [new[] { KeyCode.F7 }] = () => Player.Bombs = Player.Keys = Player.Gold = Player.Thorium = 10000,
-                [new[] { KeyCode.F8 }] = () => Player.Gold *= 2,
-                [new[] { KeyCode.F9 }] = Print
-            };
             Events.OnGameUpdated += OnGameUpdated;
+
+            MenuRenderer.Text = "Cheat Menu";
+
+            MenuRenderer
+                    .SetDefaultSkin()
+                    .AddCheckBox("Toggle Doors", (b, c) => this.ToggleDoors(c))
+                    .AddCheckBox("God Mode", (b, c) => this.MakeGod(c))
+                    .AddTextBox("Max Health", (t, c) => this.SetHealth(t, true))
+                    .AddTextBox("Current Health", (t, c) => this.SetHealth(t, false))
+                    .AddTextBox("Bombs", (t, c) => this.SetBombs(t))
+                    .AddTextBox("Keys", (t, c) => this.SetKeys(t))
+                    .AddTextBox("Gold", (t, c) => this.SetGold(t))
+                    .AddTextBox("Thorium", (t, c) => this.SetThorium(t))
+                    .AddButton("Give Curse", (c) => this.GiveCurse())
+                    .AddButton("Give Blessing", (c) => this.GiveBlessing())
+                    .AddButton("Remove Curse", (c) => this.RemoveCurse())
+                    .AddButton("Spawn Relic", (c) => this.SpawnRelic())
+                    .AddButton("Print equipment", (c) => PrintActiveItems())
+                    .AddButton("Print All Entities", (c) => PrintEntities());
+        }
+
+        private void PrintActiveItems()
+        {
+            var avatars = Game.Instance?.Simulation?.Avatars;
+            if (avatars == null || avatars.Count <= 0)
+            {
+                Logger.Debug("Unable to find any avatars!");
+                return;
+            }
+
+            var items = new List<ItemData>();
+            InventoryExt.GetItems(avatars[0], items, true);
+
+            foreach (var item in items)
+            {
+                Logger.Debug($"{item.guid} - {item.Hint} - {item.name}");
+            }
+
+            foreach(var slot in Player.Inventory.EquipmentSlots)
+            {
+                var data = (ItemData)slot?.equipment?.Entity?.Data;
+                if (data == null)
+                    Logger.Debug($"{slot.slot} - empty");
+                else
+                    Logger.Debug($"{slot.slot} - {data.guid} - {data.Hint} - {data.name}");
+            }
+        }
+
+        private void PrintEntities()
+        {
+            foreach(var entity in Game.Instance.Simulation.Entities.Entities)
+            {
+                var ext = entity.GetExtension<ItemExt>();
+                if (ext == null)
+                    continue;
+
+                Logger.Debug(ext.Data?.name);
+            }
         }
 
         private void OnGameUpdated(object sender, IGame e)
         {
-            var ops = _cheatOptions.OrderByDescending(t => t.Key.Length);
-            foreach (var op in ops)
+            if (e.KeyDown(KeyCode.F1))
             {
-                if (!AllHeld(op.Key))
-                    continue;
-
-                op.Value();
-                break;
+                _showWindow = !_showWindow;
+                Logger.Debug("Changing window mode: " + _showWindow);
+                MenuRenderer.Show = _showWindow;
+                if (_showWindow)
+                {
+                    _previousCursor = Cursor.visible;
+                    _previousLockMode = Cursor.lockState;
+                    Cursor.visible = true;
+                    Cursor.lockState = CursorLockMode.None;
+                }
+                else
+                {
+                    Cursor.visible = _previousCursor;
+                    Cursor.lockState = _previousLockMode;
+                }
             }
-        }
-
-        private bool AllHeld(params KeyCode[] keys)
-        {
-            foreach (var key in keys)
-                if (!GameInstance.KeyDown(key))
-                    return false;
-
-            return true;
         }
 
         private void Print()
         {
-            PrintIds();
-            PrintEffects();
-            PrintEnemies();
+            //PrintIds();
+            //PrintEffects();
+            //PrintEnemies();
+            PrintActiveItems();
         }
+
 
         private void PrintIds()
         {
@@ -207,18 +257,6 @@ namespace UnderMineControl.CheatMenu
             value = value.Replace("\"", "\"\"");
 
             return $"\"{value}\"";
-        }
-
-        private void OpenDoors()
-        {
-            GameInstance.Simulation.Zone.CurrentRoom.OpenDoors();
-            Logger.Debug("Doors opened");
-        }
-
-        private void CloseDoors()
-        {
-            GameInstance.Simulation.Zone.CurrentRoom.CloseDoors();
-            Logger.Debug("Doors closed");
         }
     }
 }
