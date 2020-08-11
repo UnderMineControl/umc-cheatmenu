@@ -19,12 +19,8 @@ namespace UnderMineControl.CheatMenu
         private bool _previousCursor = false;
         private CursorLockMode _previousLockMode = CursorLockMode.None;
 
-        private string _relicName = "";
-        private string _enemyName = "";
-
-        private IMenuLabel _enemyLabel;
-        private IMenuLabel _relicLabel;
-        
+        private Dictionary<string, string> _spawners = new Dictionary<string, string>();
+        private Dictionary<string, IMenuLabel> _spawnerLabels = new Dictionary<string, IMenuLabel>();
 
         public override void Initialize()
         {
@@ -51,82 +47,132 @@ namespace UnderMineControl.CheatMenu
                     .AddButton("Spawn Relic", (c) => CheatMenuExtensions.SpawnRelic(this))
                     //Debug outputs
                     .AddButton("Print equipment", (c) => PrintActiveItems())
-                    .AddButton("Print All Entities", (c) => PrintEntities())
-                    //Specific item/enemy spawns
-                    .AddTextBox("Enemy Name", (t, c) => { _enemyName = t; })
-                    .AddButton("Spawn Enemy", (c) => SpawnEnemy())
-                    .AddLabel("", out _enemyLabel)
-                    
-                    .AddTextBox("Relic Name", (t, c) => { _relicName = t; })
-                    .AddButton("Spawn Relic", (c) => SpawnRelic())
-                    .AddLabel("", out _relicLabel);
+                    .AddButton("Print All Entities", (c) => PrintEntities());
+
+            SetupSpawners();
         }
 
-        private void SpawnEnemy()
+        private void SetupSpawners()
+        {
+            Spawner(GameInstance.Data.EnemyCollection, "Enemy");
+            Spawner(GameInstance.Data.RelicCollection, "Relic");
+            Spawner(GameInstance.Data.PotionCollection, "Potion");
+        }
+
+        private void Spawner(DataObjectCollection collection, string type)
+        {
+            _spawners.Add(type, "");
+            MenuRenderer.AddTextBox($"{type} Name", (t, c) => _spawners[type] = t)
+                        .AddButton($"Spawn {type}", (c) => Spawn(type, collection))
+                        .AddLabel("", out IMenuLabel label);
+            _spawnerLabels.Add(type, label);
+        }
+
+        private void Spawn(string type, DataObjectCollection collection)
+        {
+            var label = _spawnerLabels[type];
+            var search = _spawners[type];
+
+            Logger.Debug($"Attempting to find {search} ({type})");
+
+            Spawnable(collection, search, label, type);
+        }
+
+        private void Spawnable(DataObjectCollection collection, string search, IMenuLabel label, string type)
         {
             try
             {
-                Logger.Debug(_enemyName);
-                _enemyLabel.Text = "";
+                search = search.ToLower().Trim();
+                label.Text = "";
+                DataObject data;
 
-                var enemy = GameInstance.GetEnemy(_enemyName);
-                if (enemy == null)
+                if (int.TryParse(search, out int index))
                 {
-                    var names = GameInstance.GetEnemyLike(_enemyName).ToArray();
-                    if (names.Length <= 0)
-                    {
-                        _enemyLabel.Text = "Couldn't find an enemy with that name or id!";
+                    Logger.Debug("ID found: " + index);
+                    data = GetByIndex(collection, index, label, type);
+                    if (data == null)
                         return;
-                    }
-
-                    var strNames = string.Join(", ", names);
-                    if (strNames.Length > 64)
-                        strNames = strNames.Substring(0, 64) + "...";
-
-                    _enemyLabel.Text = "Did you mean: " + strNames;
-                    return;
                 }
-
-                var entity = GameInstance.SpawnEnemy(enemy);
-                if (entity == null)
+                else
                 {
-                    _enemyLabel.Text = "Enemy couldn't spawn!";
+                    Logger.Debug("Search text found: " + search);
+                    data = GetByNameOrGuid(collection, search, label, type);
+                    if (data == null)
+                        return;
+                }
+
+                Entity result = null;
+                switch (data)
+                {
+                    case ItemData item:
+                        result = GameInstance.SpawnRelic(item);
+                        break;
+                    case EntityData enemy:
+                        result = GameInstance.SpawnEnemy(enemy);
+                        break;
+                    case AchievementData achievement:
+                        GameInstance.Game.AchievementManager.SetCompleted(achievement, !achievement.Completed);
+                        label.Text = $"{achievement.name} has been set to: {achievement.Completed}";
+                        return;
+                    default:
+                        label.Text = $"Invalid object! Cannot spawn a {data.name} ({data.GetType().Name})!";
+                        return;
+                }
+
+                if (result == null)
+                {
+                    label.Text = $"{type} couldn't spawn!";
                     return;
                 }
+
             }
             catch (Exception ex)
             {
-                Logger.Error($"Error occurred while spawning {_enemyName} (enemy): {ex}");
-                _enemyLabel.Text = "Something went wrong!";
+                Logger.Error($"Error occurred when spawning {search} ({type}): {ex}");
+                label.Text = "Something went wrong";
             }
         }
 
-        private void SpawnRelic()
+        private DataObject GetByIndex(DataObjectCollection collection, int index, IMenuLabel label, string type)
         {
-            try
-            {
-                Logger.Debug(_relicName);
-                _relicLabel.Text = "";
+            index -= 1;
 
-                var relic = GameInstance.GetRelic(_relicName);
-                if (relic == null)
-                {
-                    _relicLabel.Text = "Couldn't find an relic with that name or id!";
-                    return;
-                }
-
-                var entity = GameInstance.SpawnRelic(relic);
-                if (entity == null)
-                {
-                    _relicLabel.Text = "Relic couldn't spawn!";
-                    return;
-                }
-            }
-            catch (Exception ex)
+            if (collection.Count <= index || index < 0)
             {
-                Logger.Error($"Error occurred while spawning {_enemyName} (relic): {ex}");
-                _relicLabel.Text = "Something went wrong!";
+                label.Text = $"Invalid {type} number! It has to be between 1 and {collection.Count}";
+                return null;
             }
+
+            return collection[index];
+        }
+
+        private DataObject GetByNameOrGuid(DataObjectCollection collection, string search, IMenuLabel label, string type)
+        {
+            var entity = collection.FirstOrDefault(t =>
+                                        t.guid.ToLower() == search.ToLower() ||
+                                        t.name.ToLower() == search.ToLower());
+
+            if (entity == null)
+            {
+                var suggestion = GetSuggestions(collection, search);
+                label.Text = suggestion == null ? $"Couldn't find a {type} by that name or guid!" : $"Did you mean: {suggestion}";
+                return null;
+            }
+
+            return entity;
+        }
+
+        private string GetSuggestions(DataObjectCollection collection, string search)
+        {
+            var entities = collection.Where(t => t.name.ToLower().Contains(search.ToLower()))
+                                     .ToArray();
+
+            if (entities == null || entities.Length <= 0)
+                return null;
+
+            var suggestion = string.Join(", ", entities.Select(t => t.name));
+
+            return suggestion.Length > 64 ? suggestion.Substring(0, 64) + "..." : suggestion;
         }
 
         private void PrintActiveItems()
@@ -197,7 +243,6 @@ namespace UnderMineControl.CheatMenu
             //PrintEnemies();
             PrintActiveItems();
         }
-
 
         private void PrintIds()
         {
