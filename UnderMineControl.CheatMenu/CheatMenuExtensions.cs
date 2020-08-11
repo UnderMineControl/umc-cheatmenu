@@ -231,22 +231,24 @@ namespace UnderMineControl.CheatMenu
 
                 var relic = relics[_rnd.Next(0, relics.Length)];
 
-                var prefab = mod.GameInstance.Data.GetItemTemplate(relic);
+                mod.GameInstance.SpawnRelic(relic);
 
-                using (new ItemExt.ItemDataScope(relic))
-                {
-                    var position = Game.Instance.Simulation.Players[0].Avatar.Position + Vector3.right * 3f;
-                    var entity = Game.Instance.Simulation.SpawnEntity(prefab, position, Quaternion.identity, -1, null, null);
-                    var mover = entity.GetExtension<MoverExt>();
-                    if (mover == null)
-                        return;
+                //var prefab = mod.GameInstance.Data.GetItemTemplate(relic);
 
-                    entity.transform.position += Vector3.up;
-                    var normalized = Rand.InsideUnitCircle.normalized;
-                    var point = new Vector3(normalized.x * Rand.Range(2f, 6f), 0.0f, normalized.y * Rand.Range(2f, 4f));
-                    var walkable = Simulation.GetNearestWalkablePosition(entity.transform.LocalToWorldPoint(point), entity.AgentTypeID);
-                    mover.Launch(walkable, (float)Rand.Range(4, 5), 75f, false);
-                }
+                //using (new ItemExt.ItemDataScope(relic))
+                //{
+                //    var position = Game.Instance.Simulation.Players[0].Avatar.Position + Vector3.right * 3f;
+                //    var entity = Game.Instance.Simulation.SpawnEntity(prefab, position, Quaternion.identity, -1, null, null);
+                //    var mover = entity.GetExtension<MoverExt>();
+                //    if (mover == null)
+                //        return;
+
+                //    entity.transform.position += Vector3.up;
+                //    var normalized = Rand.InsideUnitCircle.normalized;
+                //    var point = new Vector3(normalized.x * Rand.Range(2f, 6f), 0.0f, normalized.y * Rand.Range(2f, 4f));
+                //    var walkable = Simulation.GetNearestWalkablePosition(entity.transform.LocalToWorldPoint(point), entity.AgentTypeID);
+                //    mover.Launch(walkable, (float)Rand.Range(4, 5), 75f, false);
+                //}
 
                 mod.Logger.Debug("Spawned random relic");
             }

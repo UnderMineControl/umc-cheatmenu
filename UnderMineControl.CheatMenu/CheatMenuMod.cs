@@ -9,6 +9,7 @@ using UnityEngine;
 namespace UnderMineControl.CheatMenu
 {
     using API;
+    using UnderMineControl.API.MenuItems;
 
     public class CheatMenuMod : Mod
     {
@@ -17,6 +18,13 @@ namespace UnderMineControl.CheatMenu
 
         private bool _previousCursor = false;
         private CursorLockMode _previousLockMode = CursorLockMode.None;
+
+        private string _relicName = "";
+        private string _enemyName = "";
+
+        private IMenuLabel _enemyLabel;
+        private IMenuLabel _relicLabel;
+        
 
         public override void Initialize()
         {
@@ -27,6 +35,8 @@ namespace UnderMineControl.CheatMenu
 
             MenuRenderer
                     .SetDefaultSkin()
+                    .SetSize(400, 500)
+                    //Basic Cheats
                     .AddCheckBox("Toggle Doors", (b, c) => this.ToggleDoors(c))
                     .AddCheckBox("God Mode", (b, c) => this.MakeGod(c))
                     .AddTextBox("Max Health", (t, c) => this.SetHealth(t, true))
@@ -38,9 +48,85 @@ namespace UnderMineControl.CheatMenu
                     .AddButton("Give Curse", (c) => this.GiveCurse())
                     .AddButton("Give Blessing", (c) => this.GiveBlessing())
                     .AddButton("Remove Curse", (c) => this.RemoveCurse())
-                    .AddButton("Spawn Relic", (c) => this.SpawnRelic())
+                    .AddButton("Spawn Relic", (c) => CheatMenuExtensions.SpawnRelic(this))
+                    //Debug outputs
                     .AddButton("Print equipment", (c) => PrintActiveItems())
-                    .AddButton("Print All Entities", (c) => PrintEntities());
+                    .AddButton("Print All Entities", (c) => PrintEntities())
+                    //Specific item/enemy spawns
+                    .AddTextBox("Enemy Name", (t, c) => { _enemyName = t; })
+                    .AddButton("Spawn Enemy", (c) => SpawnEnemy())
+                    .AddLabel("", out _enemyLabel)
+                    
+                    .AddTextBox("Relic Name", (t, c) => { _relicName = t; })
+                    .AddButton("Spawn Relic", (c) => SpawnRelic())
+                    .AddLabel("", out _relicLabel);
+        }
+
+        private void SpawnEnemy()
+        {
+            try
+            {
+                Logger.Debug(_enemyName);
+                _enemyLabel.Text = "";
+
+                var enemy = GameInstance.GetEnemy(_enemyName);
+                if (enemy == null)
+                {
+                    var names = GameInstance.GetEnemyLike(_enemyName).ToArray();
+                    if (names.Length <= 0)
+                    {
+                        _enemyLabel.Text = "Couldn't find an enemy with that name or id!";
+                        return;
+                    }
+
+                    var strNames = string.Join(", ", names);
+                    if (strNames.Length > 64)
+                        strNames = strNames.Substring(0, 64) + "...";
+
+                    _enemyLabel.Text = "Did you mean: " + strNames;
+                    return;
+                }
+
+                var entity = GameInstance.SpawnEnemy(enemy);
+                if (entity == null)
+                {
+                    _enemyLabel.Text = "Enemy couldn't spawn!";
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Error occurred while spawning {_enemyName} (enemy): {ex}");
+                _enemyLabel.Text = "Something went wrong!";
+            }
+        }
+
+        private void SpawnRelic()
+        {
+            try
+            {
+                Logger.Debug(_relicName);
+                _relicLabel.Text = "";
+
+                var relic = GameInstance.GetRelic(_relicName);
+                if (relic == null)
+                {
+                    _relicLabel.Text = "Couldn't find an relic with that name or id!";
+                    return;
+                }
+
+                var entity = GameInstance.SpawnRelic(relic);
+                if (entity == null)
+                {
+                    _relicLabel.Text = "Relic couldn't spawn!";
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Error occurred while spawning {_enemyName} (relic): {ex}");
+                _relicLabel.Text = "Something went wrong!";
+            }
         }
 
         private void PrintActiveItems()
