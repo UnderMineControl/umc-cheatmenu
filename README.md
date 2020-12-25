@@ -18,9 +18,9 @@ Unfortunately, the key binds are not configurable at the moment. I hope to add t
 * Spawn Relic: Spawn a random relic from the pool (must be unlocked and not already seen in this run)
 * Print equipment: Prints all your equipment to the console (console must be enabled for this to be useful)
 * Print All Entities: Currently broken/does nothing
-* Entity Name/Spawn Enemy: Spawn a specific enemy by name (broken in 1.1.0)
-* Relic Name/Spawn Relic: Spawn a relic by name or id (broken in 1.1.0)
-* Potion Name/Spawn Potion: Spawn a potion by name or id (broken in 1.1.0)
+* Entity Name/Spawn Enemy: Spawn a specific enemy by name (currently broken)
+* Relic Name/Spawn Relic: Spawn a relic by name or id (relics must be unlocked to spawn)
+* Potion Name/Spawn Potion: Spawn a potion by name or id (potions must be unlocked to spawn)
 
 ## Manual Installation
 Steps to install the cheat menu mod:
